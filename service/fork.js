@@ -1,6 +1,6 @@
 process.title = 'BeyondJS files watchers monitor';
 
-const ipc = require('beyond/utils/ipc');
+const ipc = require('@beyond-js/ipc');
 const watchers = new (require('./watchers'));
 
 ipc.handle('create', params => watchers.create(params.container));

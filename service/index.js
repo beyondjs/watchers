@@ -1,5 +1,5 @@
 const {fork} = require('child_process');
-const ipc = require('beyond/utils/ipc');
+const ipc = require('@beyond-js/ipc');
 
 module.exports = class {
     #process;

@@ -1,4 +1,4 @@
-const ipc = require('beyond/utils/ipc');
+const ipc = require('@beyond-js/ipc');
 const sep = require('path').sep;
 let counter = 0;
 
