@@ -70,4 +70,4 @@ watcher.destroy();
 
 ## License
 
-MIT © [[BeyondJS](https://beyondjs)]
+MIT © [[BeyondJS](https://beyondjs.com)]
