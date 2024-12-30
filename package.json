@@ -1,17 +1,17 @@
 {
-  "name": "@beyond-js/watchers",
-  "author": "BeyondJS",
-  "email": "hello@beyondjs.com",
-  "version": "0.0.4",
-  "license": "MIT",
-  "repository": "https://github.com/beyondjs/watchers",
-  "exports": {
-    "./client": "./client/index.js",
-    "./service": "./service/index.js"
-  },
-  "dependencies": {
-    "@beyond-js/pending-promise": "^0.0.1",
-    "@beyond-js/ipc": "^0.0.2",
-    "chokidar": "^3.5.3"
-  }
+	"name": "@beyond-js/watchers",
+	"author": "BeyondJS",
+	"email": "hello@beyondjs.com",
+	"version": "0.0.5",
+	"license": "MIT",
+	"repository": "https://github.com/beyondjs/watchers",
+	"exports": {
+		"./client": "./client/index.js",
+		"./service": "./service/index.js"
+	},
+	"dependencies": {
+		"@beyond-js/pending-promise": "^0.0.1",
+		"@beyond-js/ipc": "^0.0.9",
+		"chokidar": "^3.5.3"
+	}
 }
