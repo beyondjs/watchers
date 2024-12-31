@@ -1,5 +1,5 @@
 const PendingPromise = require('@beyond-js/pending-promise');
-const ipc = require('@beyond-js/ipc');
+const ipc = require('@beyond-js/ipc/main');
 const ChainedException = require('./chained-exception');
 
 module.exports = class {
