@@ -5,6 +5,7 @@
 	"version": "0.0.4",
 	"license": "MIT",
 	"repository": "https://github.com/beyondjs/watchers",
+	"modules": "main",
 	"exports": {
 		"./client": "./client/index.js",
 		"./service": "./service/index.js"
