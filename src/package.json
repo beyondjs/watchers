@@ -5,14 +5,37 @@
 	"version": "0.0.4",
 	"license": "MIT",
 	"repository": "https://github.com/beyondjs/watchers",
-	"modules": "main",
-	"exports": {
-		"./client": "./client/index.js",
-		"./service": "./service/index.js"
+	"modules": {
+		"path": "modules"
+	},
+	"deployment": {
+		"distributions": [
+			{
+				"name": "node",
+				"platform": "node",
+				"ports": {
+					"bundles": 1110
+				}
+			},
+			{
+				"name": "node-ts",
+				"platform": "node",
+				"ports": {
+					"bundles": 1111
+				},
+				"ts": {
+					"compiler": "tsc"
+				}
+			}
+		]
 	},
 	"dependencies": {
-		"@beyond-js/pending-promise": "^0.0.1",
-		"@beyond-js/ipc": "^0.0.2",
-		"chokidar": "^3.5.3"
+		"@beyond-js/kernel": "~0.1.12",
+		"@beyond-js/pending-promise": "~0.0.2",
+		"@beyond-js/ipc": "~1.0.0",
+		"chokidar": "~3.5.3"
+	},
+	"devDependencies": {
+		"@types/node": "~20.11.0"
 	}
 }

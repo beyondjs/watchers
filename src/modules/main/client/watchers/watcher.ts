@@ -1,38 +1,40 @@
-const PendingPromise = require('@beyond-js/pending-promise');
-const ipc = require('@beyond-js/ipc');
-const ChainedException = require('./chained-exception');
+import type { WatcherSpec } from '@beyond-js/watchers/types';
+import type { UUID } from 'crypto';
+import { PendingPromise } from '@beyond-js/pending-promise/main';
+import { ipc } from '@beyond-js/ipc/main';
+import ChainedException from './chained-exception';
 
-module.exports = class {
-	#id;
+export default class Watcher {
+	#id: UUID;
 	get id() {
 		return this.#id;
 	}
 
-	get started() {
+	get started(): boolean {
 		return !!this.#id;
 	}
 
-	#promises = {};
+	#promises: { start?: PendingPromise<UUID>; stop?: PendingPromise<void> } = {};
 	#listeners = new (require('./listeners'))(this);
 	get listeners() {
 		return this.#listeners;
 	}
 
-	get starting() {
+	get starting(): boolean {
 		return !!this.#promises.start;
 	}
 
-	get stopping() {
+	get stopping(): boolean {
 		return !!this.#promises.stop;
 	}
 
-	#container;
-	get container() {
-		return this.#container;
+	#spec: WatcherSpec;
+	get spec() {
+		return this.#spec;
 	}
 
-	constructor(container) {
-		this.#container = container;
+	constructor(spec: WatcherSpec) {
+		this.#spec = spec;
 	}
 
 	async start() {
@@ -40,14 +42,14 @@ module.exports = class {
 
 		const promises = this.#promises;
 		if (promises.start) return await promises.start;
-		const promise = new PendingPromise();
+		const promise: PendingPromise<UUID> = new PendingPromise();
 		promises.start = promise;
 
 		if (promises.stop) await promises.stop;
 
 		const error = new Error('Error starting watcher');
 		try {
-			const promise = ipc.exec('watchers', 'create', { container: this.#container });
+			const promise = ipc.exec('watchers', 'create', { spec: this.#spec });
 			this.#id = await promise;
 			promises.start.resolve(this.#id);
 		} catch (exc) {
@@ -83,4 +85,4 @@ module.exports = class {
 			delete promises.stop;
 		}
 	}
-};
+}
