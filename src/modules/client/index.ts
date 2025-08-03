@@ -32,6 +32,11 @@ export /*bundle*/ class Watchers {
 		this.#watcher = watchers.get(spec);
 	}
 
-	start = () => this.#watcher.start();
-	destroy = () => watchers.unregister(this.#spec);
+	start() {
+		this.#watcher.start();
+	}
+
+	destroy() {
+		watchers.unregister(this.#spec.path);
+	}
 }

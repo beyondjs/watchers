@@ -1,11 +1,9 @@
 import type { UUID } from 'crypto';
-import type { IListenerFilter } from '@beyond-js/watchers/types';
+import type { IListenerFilter, ListenerEventType, ListenerChangeEventType } from '@beyond-js/watchers/types';
 import type { Stats } from 'fs';
 import { ipc } from '@beyond-js/ipc/main';
 import { sep } from 'path';
 import { randomUUID } from 'crypto';
-
-export /*bundle*/ type ListenerEventType = 'add' | 'change' | 'unlink';
 
 /**
  * Emit change events about files changes
@@ -48,7 +46,8 @@ export default class Listener {
 	}
 
 	#emit(file: string, event: ListenerEventType) {
-		ipc.events.emit(`listener:${this.#id}.change`, { file: file, event: event });
+		const message: ListenerChangeEventType = { file, event };
+		ipc.events.emit(`listener:${this.#id}.change`, message);
 	}
 
 	// Called by the watcher when a change is fired

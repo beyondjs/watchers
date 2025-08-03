@@ -1,5 +1,5 @@
 {
-	"name": "service/fork",
+	"name": "service",
 	"bundle": "ts",
 	"files": "*"
 }

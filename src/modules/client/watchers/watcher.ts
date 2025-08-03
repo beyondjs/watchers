@@ -1,7 +1,7 @@
 import type { WatcherSpec } from '@beyond-js/watchers/types';
 import type { UUID } from 'crypto';
 import { PendingPromise } from '@beyond-js/pending-promise/main';
-import { ipc } from '@beyond-js/ipc/main';
+import { ipc } from '@beyond-js/ipc/child';
 import ChainedException from './chained-exception';
 
 export default class Watcher {

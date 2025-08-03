@@ -1,33 +1,43 @@
-import { ipc } from '@beyond-js/ipc/main';
+import type {
+	IListenerCreate,
+	IListenerDelete,
+	IListenerFilter,
+	ListenerChangeEventType
+} from '@beyond-js/watchers/types';
+import type Watcher from '../watcher';
+import type { UUID } from 'crypto';
+import { ipc } from '@beyond-js/ipc/child';
 import { PendingPromise } from '@beyond-js/pending-promise/main';
 import { EventEmitter } from 'events';
 
 export default class Listener extends EventEmitter {
-	#id;
+	#id: UUID;
 
-	#watcher;
-	#path;
+	#watcher: Watcher;
+	#path: string;
 	get path() {
 		return this.#path;
 	}
 
-	#filter;
+	#filter: IListenerFilter;
 
 	#destroyed = false;
 	get destroyed() {
 		return this.#destroyed;
 	}
 
-	constructor(watcher, path, filter) {
+	constructor(watcher: Watcher, path: string, filter: IListenerFilter) {
 		super();
 		if (typeof path !== 'string') throw new Error('Invalid parameters');
+
 		this.#watcher = watcher;
 		this.#path = path;
 		this.#filter = filter;
 	}
 
-	#promises = {};
-	#change = event => this.emit(event.event, event.file);
+	#promises: { start?: PendingPromise<UUID>; stop?: PendingPromise<void> } = {};
+
+	#change = (event: ListenerChangeEventType) => this.emit(event.event, event.file);
 
 	async listen() {
 		if (this.#id) return this.#id; // Listener already started
@@ -40,15 +50,15 @@ export default class Listener extends EventEmitter {
 
 		await watcher.start();
 		if (!watcher.id) {
-			const container = watcher.container;
-			const message = `Watcher "${container.is}" on "${container.path}" not started`;
-			console.log(message);
+			const spec = watcher.spec;
+			const message = `Watcher "${spec.is}" on "${spec.path}" not started`;
+			console.error(message);
 			promises.start.reject(new Error(message));
 			return;
 		}
 
 		try {
-			const specs = { watcher: watcher.id, path: this.#path, filter: this.#filter };
+			const specs: IListenerCreate = { watcher: watcher.id, path: this.#path, filter: this.#filter };
 			this.#id = await ipc.exec('watchers', 'listeners.create', specs);
 			ipc.events.on('watchers', `listener:${this.#id}.change`, this.#change);
 			promises.start.resolve(this.#id);
@@ -81,7 +91,8 @@ export default class Listener extends EventEmitter {
 
 		try {
 			ipc.events.off('watchers', `listener:${this.#id}.change`, this.#change);
-			await ipc.exec('watchers', 'listeners.delete', { watcher: watcher.id, id: this.#id });
+			const message: IListenerDelete = { watcher: watcher.id, id: this.#id };
+			await ipc.exec('watchers', 'listeners.delete', message);
 			this.#id = undefined;
 		} catch (exc) {
 			promises.stop.reject(exc);

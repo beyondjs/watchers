@@ -32,13 +32,12 @@ export default class Watchers {
 		if (watchers.paths.has(path)) {
 			watcher = watchers.paths.get(path);
 		} else {
-			const check = function (lower, higher) {
+			const check = function (lower: string, higher: string) {
 				if (higher.startsWith(`${lower}${sep}`)) {
-					lower = watchers.specs.get(lower);
-					higher = watchers.specs.get(higher);
+					const specs = { lower: watchers.specs.get(lower), higher: watchers.specs.get(higher) };
 					console.warn(
-						`Watcher of "${higher.is}" with path "${higher.path}" ` +
-							`could be using the watcher of "${lower.is}" with path "${lower.path}"`
+						`Watcher of "${specs.higher.is}" with path "${specs.higher.path}" ` +
+							`could be using the watcher of "${specs.lower.is}" with path "${specs.lower.path}"`
 					);
 				}
 			};

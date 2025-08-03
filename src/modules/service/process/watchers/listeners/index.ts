@@ -1,7 +1,7 @@
 import type { UUID } from 'crypto';
 import type { Stats } from 'fs';
 import type { IListenerFilter } from '@beyond-js/watchers/types';
-import type { ListenerEventType } from './listener';
+import type { ListenerEventType } from '@beyond-js/watchers/types';
 import Listener from './listener';
 
 export default class Listeners {

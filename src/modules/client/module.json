@@ -1,5 +1,5 @@
 {
-	"name": "service/types",
+	"name": "client",
 	"bundle": "ts",
 	"files": "*"
 }
