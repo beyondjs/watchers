@@ -3,8 +3,14 @@ import type { UUID } from 'crypto';
 import { PendingPromise } from '@beyond-js/pending-promise/main';
 import { ipc } from '@beyond-js/ipc/child';
 import ChainedException from './chained-exception';
+import Listeners from './listeners';
 
 export default class Watcher {
+	#service: string;
+	get service() {
+		return this.#service;
+	}
+
 	#id: UUID;
 	get id() {
 		return this.#id;
@@ -15,7 +21,8 @@ export default class Watcher {
 	}
 
 	#promises: { start?: PendingPromise<UUID>; stop?: PendingPromise<void> } = {};
-	#listeners = new (require('./listeners'))(this);
+
+	#listeners = new Listeners(this);
 	get listeners() {
 		return this.#listeners;
 	}
@@ -33,7 +40,8 @@ export default class Watcher {
 		return this.#spec;
 	}
 
-	constructor(spec: WatcherSpec) {
+	constructor(service: string, spec: WatcherSpec) {
+		this.#service = service;
 		this.#spec = spec;
 	}
 
@@ -49,7 +57,7 @@ export default class Watcher {
 
 		const error = new Error('Error starting watcher');
 		try {
-			const promise = ipc.exec('watchers', 'create', { spec: this.#spec });
+			const promise = ipc.exec(this.#service, 'create', { spec: this.#spec });
 			this.#id = await promise;
 			promises.start.resolve(this.#id);
 		} catch (exc) {
@@ -73,8 +81,8 @@ export default class Watcher {
 
 		const error = new Error('Error stopping watcher');
 		try {
-			await this.#listeners.destroy();
-			await ipc.exec('watchers', 'delete', { id: this.#id });
+			this.#listeners.destroy();
+			await ipc.exec(this.#service, 'delete', { id: this.#id });
 			this.#id = undefined;
 			promises.stop.resolve();
 		} catch (exc) {

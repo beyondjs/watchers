@@ -9,4 +9,9 @@ export /*bundle*/ class WatchersService {
 		this.#process = fork('fork.js', [], { cwd: __dirname });
 		ipc.register(name, this.#process);
 	}
+
+	async kill() {
+		this.#process?.kill();
+		this.#process = null;
+	}
 }

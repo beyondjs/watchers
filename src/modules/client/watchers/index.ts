@@ -1,10 +1,16 @@
 import type { WatcherSpec } from '@beyond-js/watchers/types';
 import Watcher from './watcher';
 
-export default new (class {
+/**
+ * Factory for creating and managing watchers.
+ * It ensures that only one instance of a watcher is created for each unique path.
+ * If a watcher for a specific path already exists, it increments the instance count.
+ * When the instance count reaches zero, the watcher is stopped and removed.
+ */
+export const watchers = new (class {
 	#watchers: Map<string, { instances: number; value: Watcher }> = new Map();
 
-	get(spec: WatcherSpec): Watcher {
+	get(service: string, spec: WatcherSpec): Watcher {
 		const { path } = spec;
 		const watchers = this.#watchers;
 
@@ -14,7 +20,7 @@ export default new (class {
 			return watcher.value;
 		}
 
-		const watcher = new Watcher(spec);
+		const watcher = new Watcher(service, spec);
 		watchers.set(path, { instances: 1, value: watcher });
 		return watcher;
 	}

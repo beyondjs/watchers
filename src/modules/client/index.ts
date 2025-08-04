@@ -1,13 +1,19 @@
 import type { WatcherSpec } from '@beyond-js/watchers/types';
-import watchers from './watchers';
+import type Watcher from './watchers/watcher';
+import { watchers } from './watchers';
 
-export /*bundle*/ class Watchers {
-	#spec;
+export /*bundle*/ class WatcherClient {
+	#service: string;
+	get service() {
+		return this.#service;
+	}
+
+	#spec: WatcherSpec;
 	get spec() {
 		return this.#spec;
 	}
 
-	#watcher;
+	#watcher: Watcher;
 
 	get id() {
 		return this.#watcher.id;
@@ -21,7 +27,7 @@ export /*bundle*/ class Watchers {
 		return this.#watcher.listeners;
 	}
 
-	constructor(spec: WatcherSpec) {
+	constructor(service: string, spec: WatcherSpec) {
 		if (typeof spec !== 'object') throw new Error('Invalid parameter spec');
 		this.#spec = spec;
 
@@ -29,7 +35,7 @@ export /*bundle*/ class Watchers {
 		if (typeof path !== 'string') throw new Error('Non-string provided as watch path');
 		if (!path) throw new Error('Empty string provided as watch path');
 
-		this.#watcher = watchers.get(spec);
+		this.#watcher = watchers.get(this.#service, spec);
 	}
 
 	start() {

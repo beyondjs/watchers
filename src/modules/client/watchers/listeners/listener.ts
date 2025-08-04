@@ -59,8 +59,8 @@ export default class Listener extends EventEmitter {
 
 		try {
 			const specs: IListenerCreate = { watcher: watcher.id, path: this.#path, filter: this.#filter };
-			this.#id = await ipc.exec('watchers', 'listeners.create', specs);
-			ipc.events.on('watchers', `listener:${this.#id}.change`, this.#change);
+			this.#id = await ipc.exec(this.#watcher.service, 'listeners.create', specs);
+			ipc.events.on(this.#watcher.service, `listener:${this.#id}.change`, this.#change);
 			promises.start.resolve(this.#id);
 		} catch (exc) {
 			promises.start.reject(exc);
@@ -90,9 +90,9 @@ export default class Listener extends EventEmitter {
 		if (!this.#id) throw new Error('Listener not started');
 
 		try {
-			ipc.events.off('watchers', `listener:${this.#id}.change`, this.#change);
+			ipc.events.off(this.#watcher.service, `listener:${this.#id}.change`, this.#change);
 			const message: IListenerDelete = { watcher: watcher.id, id: this.#id };
-			await ipc.exec('watchers', 'listeners.delete', message);
+			await ipc.exec(this.#watcher.service, 'listeners.delete', message);
 			this.#id = undefined;
 		} catch (exc) {
 			promises.stop.reject(exc);
