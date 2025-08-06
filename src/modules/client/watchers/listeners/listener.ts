@@ -10,6 +10,19 @@ import { ipc } from '@beyond-js/ipc/child';
 import { PendingPromise } from '@beyond-js/pending-promise/main';
 import { EventEmitter } from 'events';
 
+export /*bundle*/ interface ListenerSpec {
+	watcher: UUID;
+}
+
+/**
+ * The ListenerType is exported only for type annotations in other modules,
+ * for example when a listener instance is received as a parameter.
+ *
+ * The Listener class itself is not exported to prevent direct usage;
+ * listeners should be created and managed through the Watcher class.
+ */
+export /*bundle*/ type ListenerType = Listener;
+
 export default class Listener extends EventEmitter {
 	#id: UUID;
 
