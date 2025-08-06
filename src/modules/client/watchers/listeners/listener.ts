@@ -37,7 +37,10 @@ export default class Listener extends EventEmitter {
 
 	#promises: { start?: PendingPromise<UUID>; stop?: PendingPromise<void> } = {};
 
-	#change = (event: ListenerChangeEventType) => this.emit(event.event, event.file);
+	#change = (event: ListenerChangeEventType) => {
+		this.emit('all', event.event, event.file);
+		this.emit(event.event, event.file);
+	};
 
 	async listen() {
 		if (this.#id) return this.#id; // Listener already started

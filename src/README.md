@@ -121,7 +121,7 @@ service.kill();
     watcher. It accepts a file or directory path and, optionally, a filter object (`IListenerFilter`).
 -   `listen(): Promise<UUID>`: Registers the listener with the service process, enabling it to receive events.
 -   `stop(): Promise<void>`: Stops the listener asynchronously.
--   `on(event: string, callback: Function): void`: Attaches an event handler. The available events are `'add'`,
+-   `on(event: string, callback: Function): void`: Attaches an event handler. The available events are `'all'`, `'add'`,
     `'change'`, and `'unlink'`.
 
 #### Filter Object (`IListenerFilter`)
@@ -139,6 +139,8 @@ The `Listener` can be configured with a filter object to control which events ar
 
 Once the listener has started, it will emit the following events via IPC:
 
+-   `'all'`: Emitted on any event (`'add'`, `'change'`, or `'unlink'`). The callback function receives two arguments:
+    the event type (`'add'`, `'change'`, or `'unlink'`) and the file path.
 -   `'add'`: Emitted when a new file or directory is added.
 -   `'change'`: Emitted when an existing file is modified.
 -   `'unlink'`: Emitted when a file or directory is deleted.
