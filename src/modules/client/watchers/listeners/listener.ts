@@ -23,7 +23,7 @@ export /*bundle*/ interface ListenerSpec {
  */
 export /*bundle*/ type ListenerType = Listener;
 
-export default class Listener extends EventEmitter {
+export class Listener extends EventEmitter {
 	#id: UUID;
 
 	#watcher: Watcher;

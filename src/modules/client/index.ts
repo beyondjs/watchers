@@ -1,5 +1,6 @@
 import type { WatcherSpec } from '@beyond-js/watchers/types';
 import type Watcher from './watchers/watcher';
+import type Listeners from './watchers/listeners';
 import { watchers } from './watchers';
 
 export /*bundle*/ class WatcherClient {
@@ -23,7 +24,7 @@ export /*bundle*/ class WatcherClient {
 		return this.#watcher.started;
 	}
 
-	get listeners() {
+	get listeners(): Listeners {
 		return this.#watcher.listeners;
 	}
 

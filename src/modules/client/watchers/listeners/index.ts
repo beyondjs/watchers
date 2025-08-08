@@ -1,7 +1,7 @@
 import type Watcher from '../watcher';
 import type { IListenerFilter } from '@beyond-js/watchers/types';
 import type { UUID } from 'crypto';
-import Listener from './listener';
+import { Listener } from './listener';
 
 export default class Listeners {
 	#listeners = new Map();
