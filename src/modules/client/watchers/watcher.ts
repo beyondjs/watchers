@@ -45,7 +45,7 @@ export default class Watcher {
 		this.#spec = spec;
 	}
 
-	async start() {
+	async start(): Promise<UUID> {
 		if (this.#id) return; // Watcher already started
 
 		const promises = this.#promises;

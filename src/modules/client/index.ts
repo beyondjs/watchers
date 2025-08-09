@@ -39,8 +39,8 @@ export /*bundle*/ class WatcherClient {
 		this.#watcher = watchers.get(this.#service, spec);
 	}
 
-	start() {
-		this.#watcher.start();
+	async start() {
+		return await this.#watcher.start();
 	}
 
 	destroy() {
