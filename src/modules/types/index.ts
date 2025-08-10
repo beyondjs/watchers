@@ -16,7 +16,7 @@ export /*bundle*/ interface WatcherSpec {
 export /*bundle*/ interface IListenerFilter {
 	includes?: string[];
 	excludes?: string[];
-	extname?: string[];
+	extname?: string | string[];
 	filename?: string;
 }
 
