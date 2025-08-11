@@ -36,7 +36,8 @@ export /*bundle*/ class WatcherClient {
 		if (typeof path !== 'string') throw new Error('Non-string provided as watch path');
 		if (!path) throw new Error('Empty string provided as watch path');
 
-		this.#watcher = watchers.get(this.#service, spec);
+		this.#service = service;
+		this.#watcher = watchers.get(service, spec);
 	}
 
 	async start() {

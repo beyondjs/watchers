@@ -1,6 +1,6 @@
 import type { WatcherSpec, IListenerCreate, IListenerDelete } from '@beyond-js/watchers/types';
 import type { UUID } from 'crypto';
-import { ipc } from '@beyond-js/ipc/main';
+import { ipc } from '@beyond-js/ipc/child';
 import Watchers from './watchers';
 
 process.title = 'BeyondJS files watchers monitor';
