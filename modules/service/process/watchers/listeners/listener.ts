@@ -1,7 +1,7 @@
 import type { UUID } from 'crypto';
 import type { IListenerFilter, ListenerEventType, ListenerChangeEventType } from '@beyond-js/watchers/types';
 import type { Stats } from 'fs';
-import { ipc } from '@beyond-js/ipc/main';
+import { ipc } from '@beyond-js/ipc/child';
 import { sep } from 'path';
 import { randomUUID } from 'crypto';
 

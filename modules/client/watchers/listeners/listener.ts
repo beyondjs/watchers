@@ -6,7 +6,7 @@ import type {
 } from '@beyond-js/watchers/types';
 import type Watcher from '../watcher';
 import type { UUID } from 'crypto';
-import { ipc } from '@beyond-js/ipc/child';
+import { ipc } from '@beyond-js/ipc/wrapper';
 import { PendingPromise } from '@beyond-js/pending-promise/main';
 import { EventEmitter } from 'events';
 
@@ -76,7 +76,7 @@ export class Listener extends EventEmitter {
 		try {
 			const specs: IListenerCreate = { watcher: watcher.id, path: this.#path, filter: this.#filter };
 			this.#id = await ipc.exec(this.#watcher.service, 'listeners.create', specs);
-			ipc.events.on(this.#watcher.service, `listener:${this.#id}.change`, this.#change);
+			ipc.on(this.#watcher.service, `listener:${this.#id}.change`, this.#change);
 			promises.start.resolve(this.#id);
 		} catch (exc) {
 			promises.start.reject(exc);
@@ -106,7 +106,10 @@ export class Listener extends EventEmitter {
 		if (!this.#id) throw new Error('Listener not started');
 
 		try {
-			ipc.events.off(this.#watcher.service, `listener:${this.#id}.change`, this.#change);
+			// Remove the `change` event listener
+			ipc.off(this.#watcher.service, `listener:${this.#id}.change`, this.#change);
+
+			// Send the delete message to the IPC service to remove the listener from the service and stop it
 			const message: IListenerDelete = { watcher: watcher.id, id: this.#id };
 			await ipc.exec(this.#watcher.service, 'listeners.delete', message);
 			this.#id = undefined;

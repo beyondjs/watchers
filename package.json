@@ -1,6 +1,6 @@
 {
 	"name": "@beyond-js/watchers",
-	"version": "1.0.6",
+	"version": "1.0.7",
 	"author": {
 		"name": "BeyondJS",
 		"email": "hello@beyondjs.com"
@@ -41,7 +41,7 @@
 	"dependencies": {
 		"@beyond-js/kernel": "~0.1.12",
 		"@beyond-js/pending-promise": "~0.0.2",
-		"@beyond-js/ipc": "~1.0.5",
+		"@beyond-js/ipc": "~1.0.10",
 		"chokidar": "4.0.2"
 	},
 	"devDependencies": {

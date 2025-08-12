@@ -26,6 +26,10 @@ export default class Watcher {
 	}
 
 	constructor(spec: WatcherSpec) {
+		if (!spec || typeof spec.path !== 'string' || typeof spec.is !== 'string') {
+			throw new Error(`Invalid watcher spec, expected { path: string, is: string }`);
+		}
+
 		this.#spec = spec;
 
 		const { path } = spec;

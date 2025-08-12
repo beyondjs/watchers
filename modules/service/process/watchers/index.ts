@@ -20,7 +20,12 @@ export default class Watchers {
 	get = (id: UUID) => this.#watchers.client.get(id);
 
 	create(spec: WatcherSpec) {
-		if (typeof spec !== 'object') throw new Error(`Invalid parameters`);
+		if (typeof spec !== 'object' || !spec.is || !spec.path) {
+			const message =
+				`Invalid watcher spec: ${JSON.stringify(spec)}. ` +
+				'It must be an object with `is` and `path` properties';
+			throw new Error(message);
+		}
 
 		const watchers = this.#watchers;
 		const { path } = spec;

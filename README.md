@@ -39,7 +39,7 @@ import { WatcherClient } from '@beyond-js/watchers/client';
 const spec = {
 	path: '/path/to/watch',
 	excludes: ['node_modules'],
-	is: 'name-of-the-watcher'
+	is: 'name-of-the-watcher' // Used for debugging to help identify when multiple watchers are attached to the same path.
 };
 
 const watcher = new WatcherClient('name-of-watchers-service', spec);
