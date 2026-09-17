@@ -1,15 +1,5 @@
-# dev-mode.md
+# Development fork marker
 
-This file indicates that the package is running in **local/development mode**.
+The presence of this file beside fork.js selects legacy BEE loading from localhost:1110. Without the marker, fork.js requires the built `@beyond-js/watchers/service/process` module. Absence of the marker does not prove a build or publication exists.
 
-When this file exists:
-
--   The **BEE** runtime is used, loading files from the **DevServer**.
-
-When this file does not exist:
-
--   The package has been built and published to **NPM**.
--   Code loads modules directly from the published package.
-
-> Note: The file `fork.js` is treated as a static file in `package.json`. The entry must be `fork/fork.js`. Do not
-> change it to `fork`, as this would include the entire folder and cause `dev-mode.md` to be published as well.
+The package static entry selects only `fork/fork.js`; adding the whole directory would also copy this marker and select the development bootstrap in a built package. See [startup and readiness](../docs/architecture.md#startup-and-readiness) for path, IPC and lifecycle prerequisites.
