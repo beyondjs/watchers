@@ -7,7 +7,18 @@ process.title = 'BeyondJS files watchers monitor';
 
 const watchers = new Watchers();
 ipc.handle('create', (spec: WatcherSpec) => watchers.create(spec));
-ipc.handle('delete', async (id: UUID) => await watchers.delete(id));
+
+/**
+ * The action was specified with the identifier of the client, and the published client (1.0.7) sends it
+ * wrapped as `{ id }`. Both are accepted: rejecting the wrapped form made every final release of a watcher
+ * fail with `Client "[object Object]" is not registered`, surfacing in the client process as an uncaught
+ * "Error stopping watcher" and leaving the watcher running in this process.
+ */
+ipc.handle('delete', async (params: UUID | { id: UUID }) => {
+	const id = typeof params === 'string' ? params : params?.id;
+	if (!id) throw new Error(`Client identifier not defined`);
+	await watchers.delete(id);
+});
 
 ipc.handle('listeners.create', (params: IListenerCreate) => {
 	if (!params) throw new Error(`Invalid parameters`);

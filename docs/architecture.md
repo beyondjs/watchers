@@ -70,7 +70,7 @@ The [filesystem Watcher](../modules/service/process/watchers/watcher.ts) starts 
 | IPC action | Intended payload and current service handling |
 | --- | --- |
 | create | WatcherSpec → client UUID |
-| delete | Service expects the UUID directly; current client sends `{id}`. This mismatch prevents ordinary final-release deletion. |
+| delete | The service accepts the client identifier directly or wrapped as `{id}`, which is what the published client (1.0.7) sends. Earlier service source accepted only the bare identifier, so every final release failed with `Client "[object Object]" is not registered`. |
 | listeners.create | `{watcher, path, filter}` → listener UUID |
 | listeners.delete | `{watcher, id}` removes one service listener |
 
