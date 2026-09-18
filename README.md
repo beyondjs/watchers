@@ -10,4 +10,16 @@ Start/register the service separately from creating clients. WatcherClient expos
 
 The build/test prerequisites and gaps are documented in the guide. No generic npm test/build command is supplied by the source manifest.
 
+## Serving the service to another project (development)
+
+The published package exposes only the client and types (`./service` and `./service/process` are empty exports), so a project that needs the watchers service process during development must obtain it from this checkout. The `node-esm` distribution (port 1120, ESM bundles, development tools disabled) serves the compiled modules through the Beyond Engine so that a modern BEE Node process can import `@beyond-js/watchers/service/process`:
+
+```sh
+cd /absolute/path/to/watchers
+npm install --no-audit --no-fund     # Engine validates the dependencies of the served modules
+node /absolute/path/to/engine/index.js
+```
+
+The Packages `@beyond-js/packages/watchers` module spawns the child process with the loader's `execArgv` and `BEE_URL=http://localhost:1120`, awaits its readiness through the IPC channel and registers it as the named service. This is a development arrangement; the service is still not published.
+
 MIT; see [LICENSE](LICENSE).
