@@ -1,5 +1,5 @@
 # Development fork marker
 
-The presence of this file beside fork.js selects legacy BEE loading from localhost:1110. Without the marker, fork.js requires the built `@beyond-js/watchers/service/process` module. Absence of the marker does not prove a build or publication exists.
+The presence of this file beside `fork.js` selects legacy BEE loading from localhost:1110 in that retained entry. `WatchersService` no longer forks that file: it starts the service by importing `@beyond-js/watchers/service/process` under the loader of the parent, with a readiness report. The entry and this marker are kept for the legacy bootstrap only.
 
-The package static entry selects only `fork/fork.js`; adding the whole directory would also copy this marker and select the development bootstrap in a built package. See [startup and readiness](../docs/architecture.md#startup-and-readiness) for path, IPC and lifecycle prerequisites.
+The package static entry selects only `fork/fork.js`; adding the whole directory would also copy this marker.

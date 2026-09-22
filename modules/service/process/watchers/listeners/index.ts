@@ -7,6 +7,10 @@ import Listener from './listener';
 export default class Listeners {
 	#listeners: Map<string, Listener> = new Map();
 
+	get size() {
+		return this.#listeners.size;
+	}
+
 	/**
 	 *  Creates a new listener
 	 *

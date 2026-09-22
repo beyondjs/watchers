@@ -41,6 +41,7 @@ export default class Listener {
 		typeof filter.extname === 'string' ? (filter.extname = [filter.extname]) : null;
 		if (filter.extname && !(filter.extname instanceof Array)) throw new Error('Invalid "extname" specification');
 
+		this.#client = client;
 		this.#path = path;
 		this.#filter = filter;
 	}

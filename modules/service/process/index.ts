@@ -40,3 +40,8 @@ ipc.handle('listeners.delete', (params: IListenerDelete) => {
 	const watcher = watchers.get(params.watcher);
 	watcher.listeners.stop(params.id);
 });
+
+/**
+ * What this process holds, for a client that wants to check that everything it released is gone
+ */
+ipc.handle('size', () => watchers.size);

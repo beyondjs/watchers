@@ -19,7 +19,14 @@ export default class Watchers {
 	has = (id: UUID) => this.#watchers.client.has(id);
 	get = (id: UUID) => this.#watchers.client.get(id);
 
-	create(spec: WatcherSpec) {
+	/**
+	 * Registers a client of the watcher of a path, creating the watcher when the path has none. It answers
+	 * with the identifier of the client once the watcher is ready: its initial scan completed and events
+	 * are being delivered, so a change made after this answer is observed.
+	 *
+	 * @throws When the specification is invalid, or when the filesystem watcher fails before it is ready
+	 */
+	async create(spec: WatcherSpec): Promise<UUID> {
 		if (typeof spec !== 'object' || !spec.is || !spec.path) {
 			const message =
 				`Invalid watcher spec: ${JSON.stringify(spec)}. ` +
@@ -72,6 +79,13 @@ export default class Watchers {
 		const uuid = randomUUID();
 		ids.add(uuid);
 		watchers.client.set(uuid, watcher);
+
+		try {
+			await watcher.ready;
+		} catch (error) {
+			await this.delete(uuid).catch(() => void 0);
+			throw error;
+		}
 		return uuid;
 	}
 
@@ -89,12 +103,19 @@ export default class Watchers {
 		ids.delete(id);
 		watcher.unregister(id);
 
+		watchers.client.delete(id);
 		if (!ids.size) {
 			watchers.clients.delete(watcher);
 			watchers.paths.delete(watcher.path);
+			watchers.specs.delete(watcher.path);
 			await watcher.destroy();
 		}
+	}
 
-		watchers.client.delete(id);
+	/** How many watchers, clients and listeners this process holds, for diagnostics */
+	get size() {
+		let listeners = 0;
+		this.#watchers.paths.forEach(watcher => (listeners += watcher.listeners.size));
+		return { watchers: this.#watchers.paths.size, clients: this.#watchers.client.size, listeners };
 	}
 }

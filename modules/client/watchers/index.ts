@@ -25,7 +25,11 @@ export const watchers = new (class {
 		return watcher;
 	}
 
-	unregister(path: string): void {
+	/**
+	 * Releases one reference. When it was the last, the watcher is stopped in the service; the promise
+	 * answers when that release has been attempted, so a caller can stop the service afterwards.
+	 */
+	async unregister(path: string): Promise<void> {
 		const watchers = this.#watchers;
 
 		if (!watchers.has(path)) {
@@ -35,9 +39,9 @@ export const watchers = new (class {
 
 		const watcher = watchers.get(path);
 		watcher.instances--;
-		if (!watcher.instances) {
-			watcher.value.stop().catch(exc => console.log(exc.stack));
-			watchers.delete(path);
-		}
+		if (watcher.instances) return;
+
+		watchers.delete(path);
+		await watcher.value.stop().catch(exc => console.log(exc.stack));
 	}
 })();

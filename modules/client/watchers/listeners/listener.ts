@@ -26,6 +26,11 @@ export /*bundle*/ type ListenerType = Listener;
 export class Listener extends EventEmitter {
 	#id: UUID;
 
+	/** The identifier the service gave this listener, once it listens */
+	get id() {
+		return this.#id;
+	}
+
 	#watcher: Watcher;
 	#path: string;
 	get path() {
@@ -68,31 +73,47 @@ export class Listener extends EventEmitter {
 		}
 	}
 
+	/**
+	 * Registers the listener in the service and starts receiving events. The watcher is started first if it
+	 * was not, so listening resolves once the service reports both.
+	 *
+	 * @throws When the listener was destroyed, or when the service refuses the watcher or the listener
+	 */
 	async listen() {
+		if (this.#destroyed) throw new Error(`FS listener "${this.#path}" is destroyed`);
 		if (this.#id) return this.#id; // Listener already started
 
 		const promises = this.#promises;
 		const watcher = this.#watcher;
 
 		if (promises.start) return await promises.start;
-		promises.start = new PendingPromise();
+		const starting: PendingPromise<UUID> = new PendingPromise();
+		promises.start = starting;
 
-		await watcher.start();
-		if (!watcher.id) {
-			const spec = watcher.spec;
-			const message = `Watcher "${spec.is}" on "${spec.path}" not started`;
-			console.error(message);
-			promises.start.reject(new Error(message));
-			return;
-		}
+		// The outcome is reported to whoever asked for it; this keeps the promise from being unobserved
+		starting.catch(() => void 0);
 
 		try {
+			await watcher.start();
+			if (!watcher.id) {
+				const spec = watcher.spec;
+				throw new Error(`Watcher "${spec.is}" on "${spec.path}" not started`);
+			}
+
 			const specs: IListenerCreate = { watcher: watcher.id, path: this.#path, filter: this.#filter };
-			this.#id = await ipc.exec(this.#watcher.service, 'listeners.create', specs);
+			const id: UUID = await ipc.exec(this.#watcher.service, 'listeners.create', specs);
+
+			// Destroyed while the service was registering it: release it there before anyone hears from it
+			if (this.#destroyed) {
+				await ipc.exec(this.#watcher.service, 'listeners.delete', { watcher: watcher.id, id });
+				throw new Error(`FS listener "${this.#path}" was destroyed while it was starting`);
+			}
+
+			this.#id = id;
 			ipc.on(this.#watcher.service, `listener:${this.#id}.change`, this.#change);
-			promises.start.resolve(this.#id);
+			starting.resolve(this.#id);
 		} catch (exc) {
-			promises.start.reject(exc);
+			starting.reject(exc);
 			throw exc;
 		} finally {
 			delete promises.start;
@@ -159,6 +180,12 @@ export class Listener extends EventEmitter {
 
 		this.emit('destroyed');
 		this.removeAllListeners();
+
+		// A listener that is still starting is released by its own start, which sees the flag
+		if (this.#promises.start) {
+			await this.#promises.start.catch(() => void 0);
+			return;
+		}
 		if (!this.#id) return;
 		await this.stop().catch(exc => console.log(exc.stack));
 	}

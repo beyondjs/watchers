@@ -2,6 +2,7 @@ import type { WatcherSpec } from '@beyond-js/watchers/types';
 import type { UUID } from 'crypto';
 import type { Stats } from 'fs';
 import * as chokidar from 'chokidar';
+import { PendingPromise } from '@beyond-js/pending-promise/main';
 import Listeners from './listeners';
 
 /**
@@ -20,9 +21,21 @@ export default class Watcher {
 		return this.#listeners;
 	}
 
-	#ready = false;
-	get ready() {
+	/** Resolves when the initial scan of the root completed and events are being delivered */
+	#ready: PendingPromise<void> = new PendingPromise();
+	get ready(): Promise<void> {
 		return this.#ready;
+	}
+
+	#scanned = false;
+	get scanned() {
+		return this.#scanned;
+	}
+
+	/** The errors the filesystem watcher reported, kept so a client can be told what went wrong */
+	#errors: string[] = [];
+	get errors() {
+		return this.#errors;
 	}
 
 	constructor(spec: WatcherSpec) {
@@ -45,14 +58,25 @@ export default class Watcher {
 		this.#watcher = watcher;
 		const listeners = this.#listeners;
 
-		const add = (file: string, stats: Stats) => this.#ready && listeners.change('add', file, stats);
-		const unlink = (file: string, stats: Stats) => this.#ready && listeners.change('unlink', file, stats);
-		const change = (file: string, stats: Stats) => this.#ready && listeners.change('change', file, stats);
+		const add = (file: string, stats: Stats) => this.#scanned && listeners.change('add', file, stats);
+		const unlink = (file: string, stats: Stats) => this.#scanned && listeners.change('unlink', file, stats);
+		const change = (file: string, stats: Stats) => this.#scanned && listeners.change('change', file, stats);
 
-		watcher.on('ready', () => (this.#ready = true));
+		watcher.on('ready', () => {
+			this.#scanned = true;
+			this.#ready.resolve();
+		});
 		watcher.on('add', add);
 		watcher.on('unlink', unlink);
 		watcher.on('change', change);
+
+		// An error event with no subscriber would end this process; it is recorded and reported instead
+		watcher.on('error', (error: Error) => {
+			const message = `Filesystem watcher of "${path}" reported: ${error?.message ?? error}`;
+			this.#errors.push(message);
+			console.error(message);
+			this.#scanned || this.#ready.reject(new Error(message));
+		});
 	}
 
 	/**
@@ -64,8 +88,10 @@ export default class Watcher {
 		this.#listeners.unregister(client);
 	}
 
-	// Chokidar watcher .close method is async
-	destroy() {
-		this.#watcher.close().catch(exc => console.log(exc.stack));
+	/**
+	 * Closes the filesystem watcher and answers when it is closed
+	 */
+	async destroy(): Promise<void> {
+		await this.#watcher.close();
 	}
 }

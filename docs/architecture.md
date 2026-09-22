@@ -1,100 +1,62 @@
 # Watcher service, clients and events
 
-Watchers runs chokidar in a forked Node process and routes filtered file notifications over Beyond IPC. A main process starts and registers a named service; callers create WatcherClient references to monitored roots and listeners beneath those roots. It supplies filesystem events, not compiler invalidation, HMR or durable event replay.
+Watchers runs chokidar in a child Node process and routes filtered file notifications over Beyond IPC. A parent starts and registers the named service; callers hold `WatcherClient` references to watched roots and create listeners beneath them. The package supplies filesystem events: compiler invalidation and update application belong to its consumers.
 
 ## Public modules and dependencies
 
-[package.json](../package.json) defines Beyond public modules beneath `modules` and includes `fork/fork.js` as a static asset. `@beyond-js/ipc` provides action/event routing; `@beyond-js/pending-promise` coordinates calls; chokidar is pinned to 4.0.2. Node process, filesystem and fork APIs make this a Node service, not a browser watcher.
+[package.json](../package.json) declares the public modules beneath `modules`, `@beyond-js/ipc` for action and event routing, `@beyond-js/pending-promise` for settlement, `@beyond-js/kernel` as the legacy runtime dependency and `chokidar` 4.0.2. `fork/fork.js` is a retained static entry for the legacy BEE bootstrap and is not used by `WatchersService`.
 
-| Import | Public API / implementation |
+| Import | Public API |
 | --- | --- |
-| `@beyond-js/watchers/service` | [WatchersService](../modules/service/main/index.ts), fork creation and registration |
-| `@beyond-js/watchers/service/process` | [Service handlers](../modules/service/process/index.ts), startup side effects, no marked value export |
-| `@beyond-js/watchers/client` | [WatcherClient](../modules/client/index.ts), ListenerType and ListenerSpec type exports from internal listener source |
+| `@beyond-js/watchers/service` | [WatchersService](../modules/service/main/index.ts) and `IWatchersServiceOptions`: starts the child, registers it, stops it |
+| `@beyond-js/watchers/service/process` | [The handlers](../modules/service/process/index.ts) installed by importing the module in the child: `create`, `delete`, `listeners.create`, `listeners.delete`, `size` |
+| `@beyond-js/watchers/client` | [WatcherClient](../modules/client/index.ts); `ListenerType` and `ListenerSpec` types |
 | `@beyond-js/watchers/types` | [WatcherSpec, IListenerFilter, IListenerCreate, IListenerDelete, ListenerEventType, ListenerChangeEventType](../modules/types/index.ts) |
 
-Internal Watcher and Listener classes are obtained through clients/factories, not separate public imports.
+The published package's exports map answers `./service` and `./service/process` with empty objects: only the client half is published. A consumer that needs the service compiles it from these sources, which the Beyond compiler's bootstrap does by serving this checkout.
 
-## Startup and readiness
+## The service
 
-`new WatchersService(name, options)` computes the child entrypoint as `join(process.cwd(), 'fork/fork.js')`, forks it with child cwd set to the service module's `__dirname`, and registers the fork under name in the **main** IPC handler. The optional `sourcemaps` value enables Node's source-map flag. Its type is currently string despite the boolean used by the test fixture. The fork receives an explicit execArgv array containing only the optional `--enable-source-maps`, so parent loader flags are not inherited through execArgv. Environment-based Node configuration is a separate mechanism; it is not prohibited by this code.
+`new WatchersService(name = 'watchers', options?)` does nothing until `start()`. `start()` spawns a Node child with the arguments of the current process (`execArgv`, so the child registers the same module loader), an inline module that imports `@beyond-js/watchers/service/process` and sends `{ type: 'watchers:ready' }`, or `{ type: 'watchers:error', message }` and exits when the import fails. The parent resolves once ready arrives, registers the child in the main IPC router under the name, and rejects when the child reports an error, exits, or stays silent for `timeout` (15 s), killing the child in that case. Options: `execArgv`, `env` (added to the parent's), `cwd` (where the child resolves installed dependencies), `specifier` (the module to import), `timeout`, `sourcemaps`.
 
-This entrypoint lookup depends on the caller's working directory containing the static fork file; installing the package somewhere else does not guarantee that layout. [fork.js](../fork/fork.js) checks for an adjacent `dev-mode.md`. If present it initializes legacy BEE against localhost:1110 and imports the service process. Otherwise it requires the built `@beyond-js/watchers/service/process`. The marker is a mode switch, not proof the absent-marker environment was actually built/published.
+`stop()` unregisters the name, ends the child and waits for it to exit, forcing it after three seconds. `kill()` is `stop()` kept for compatibility. `pid` and `started` describe the running child. A second `start()` throws.
 
-WatchersService does not await child initialization or register a ready/error handshake. `kill()` sends a kill signal and clears its local reference; it does not await child exit, unregister the IPC name, or gracefully drain listeners. No automatic child restart/replay is implemented. A modern BEE Node integration must deliberately replace or adapt the legacy child bootstrap; the service currently does not accept a loader/entrypoint option.
+The child installs its handlers as an effect of importing the process module; its `size` action answers how many watchers, clients and listeners it holds, which is what a consumer checks after releasing everything.
 
-## Client and sharing model
+## Clients and the sharing of watchers
 
-```ts
-import { WatcherClient } from '@beyond-js/watchers/client';
+`new WatcherClient(service, { path, is, excludes? })` obtains the watcher of `path` from a process-wide registry: clients of one exact path string share one watcher, whose first specification decides its root exclusions. `start()` creates the watcher in the service when it is not created yet and resolves with its identifier once the service reports it ready: the initial scan of the root is complete and events are being delivered, so a write made right after is observed. `id` and `started` follow that.
 
-// The named service must already be registered and ready in the IPC topology.
-const watcher = new WatcherClient(serviceName, {
-    path: rootPath,
-    is: 'application-sources',
-    excludes: ['generated']
-});
-const listener = watcher.listeners.create(rootPath, { extname: ['.ts'] });
-listener.on('change', file => invalidateSource(file));
-await listener.listen();
-```
+`destroy()` releases this client's reference and resolves when the release was attempted; the watcher is deleted in the service when the last reference is released, its listeners first. A second `destroy()` of the same client is ignored with a warning, so it never releases another client's reference. `start()` after `destroy()` is refused.
 
-`serviceName`, `rootPath` and the invalidation callback are application configuration. Register event callbacks before listen. `listen()` starts the shared watcher if needed, but neither that RPC nor listener registration waits for chokidar's ready event. Use a separate readiness contract when initial scan completion matters.
+The service registry keeps one chokidar watcher per path with the set of client identifiers attached to it, and removes the watcher, its specification and its clients when the last client is deleted, awaiting the close of the filesystem watcher. A path nested under another watched path is a warning in the service, not an automatic reuse.
 
-WatcherClient exposes service/spec/id/started, listeners, start and destroy. **It has no stop method.** `destroy()` releases one reference in the module-local [watchers cache](../modules/client/watchers/index.ts). Cache identity is only the exact path string, excluding service name and options; a second client on the same path reuses the first service/spec. Paths are not canonicalized. Repeated destroy has no guard and can decrement another client's reference. While multiple clients share a watcher, they also share its Listeners object.
+## Listeners and filters
 
-The internal [Watcher](../modules/client/watchers/watcher.ts) manages start/stop promises and its service-issued UUID. Start requests `create`; subsequent start returns undefined if already started despite its UUID return annotation. Final cache release begins stop asynchronously. It destroys tracked listeners, requests delete, then clears the UUID if successful. There is no awaitable public release completion through WatcherClient.destroy.
+`client.listeners.create(path, filter)` creates a listener under the root; `listen()` starts the shared watcher if needed, registers the listener in the service and subscribes to its events, resolving with the identifier the service gave it (`id`). Filters are literal:
 
-## Listener API and filter semantics
-
-`watcher.listeners.create(path, filter)` creates a Listener, whose public instance methods include EventEmitter on/off, listen, stop and destroy. ListenerType is the exported annotation; direct construction is internal. Filters use literal paths, not globs.
-
-| Field | Service matching behavior |
+| Field | Matching in the service |
 | --- | --- |
-| path | Only the exact path or descendants separated by the OS separator; trailing separator is removed once. |
-| filename | Exact basename match at any depth under listener path. |
-| extname | String or array normalized to array; exact extension membership including dot. |
-| excludes | Relative literal file/directory paths joined beneath listener path; matching subtree is excluded. `*.md` has no wildcard meaning. |
-| includes | Relative literal paths/subtrees. Omission accepts all otherwise matching paths; empty array accepts no descendants, but exact listener path still qualifies. |
+| `path` | The listener's path itself, or a descendant separated by the platform separator |
+| `filename` | Exact basename at any depth |
+| `extname` | Exact extension including the dot, one or several |
+| `excludes` | Relative literal paths joined under the listener path; the entry and its subtree are excluded |
+| `includes` | Relative literal paths; when given, only the entries and their subtrees pass |
 
-Listener filters narrow emitted events; they do not start separate chokidar watchers. The root Watcher has its own exclusion layer: built-in `node_modules`, `builds`, `.builds`, `.beyond` plus spec.excludes are tested with string `endsWith`, not the listener's path-containment semantics.
+A listener emits `all` with `(event, file)` and then the specific `add`, `change` or `unlink` with `file`, as two independent announcements: a subscriber of one that throws is reported and does not keep the other from being announced. Only those three chokidar events are forwarded; directory events are not. Events before the root's initial scan completes are suppressed, which is what the readiness of `start()` answers. Two writes of one file within chokidar's throttle window arrive as one event.
 
-`all` receives `(eventName, filePath)` before the specific `add`, `change` or `unlink` event receives filePath. Only those chokidar file events are connected; `addDir`/`unlinkDir` are not forwarded as directory events. Initial adds before chokidar ready are suppressed. Stats is accepted internally but omitted from the wire message. Events are asynchronous observations, not a lossless operation log.
+`stop()` removes the listener from the service and its subscription; `destroy()` discards it, releases it when it was registered, and answers when the release was attempted. A listener destroyed while it is registering is released by that registration when it completes, and its `listen()` rejects. `listeners.delete(id)` destroys the listener with that identifier; `listeners.size` counts the listeners held. Every release settles the promise a concurrent caller receives exactly once, and a release that fails is reported rather than left as an unhandled rejection.
 
-## Service flow
+## Errors and readiness of the filesystem watcher
 
-The [service registry](../modules/service/process/watchers/index.ts) caches one chokidar Watcher per exact path and returns a fresh client UUID for each create RPC. It records path/spec, watcher-to-client-ID Set and ID-to-watcher mappings. The first spec determines root exclusions. Nested roots produce warnings rather than automatic ancestor reuse.
+The service subscribes to chokidar's `error` event: an error is recorded on the watcher, printed, and rejects the watcher's readiness when it happens before the initial scan completes, so a client's `start()` fails instead of the service process ending on an unhandled emitter error. After readiness, an error is recorded and printed; it is not delivered to clients.
 
-The [filesystem Watcher](../modules/service/process/watchers/watcher.ts) starts chokidar immediately, suppresses file events until ready, then passes each event to [Listeners](../modules/service/process/watchers/listeners/index.ts). [Listener](../modules/service/process/watchers/listeners/listener.ts) filters and emits `listener:<listener UUID>.change` through child IPC with `{file, event}`. Client Listener subscribes using the named service as event origin, then re-emits through EventEmitter.
+A client cannot reach a service that stopped: `start()` and `listen()` reject with the IPC error naming the missing target.
 
-| IPC action | Intended payload and current service handling |
-| --- | --- |
-| create | WatcherSpec → client UUID |
-| delete | The service accepts the client identifier directly or wrapped as `{id}`, which is what the published client (1.0.7) sends. Earlier service source accepted only the bare identifier, so every final release failed with `Client "[object Object]" is not registered`. |
-| listeners.create | `{watcher, path, filter}` → listener UUID |
-| listeners.delete | `{watcher, id}` removes one service listener |
+## Consumers
 
-These actions are internal trusted-process contracts, not authenticated network APIs. Registration/name ownership and IPC lifecycle must be managed by the application.
+The Beyond compiler starts the service from its own wrapper with the same readiness protocol (`watchers:ready`), gives each package a client, and creates listeners for its inputs; Finder creates one listener per finder and File one per file or shares a listener. None of them creates the service by importing the client.
 
-## Lifecycle limitations requiring repair
+## Build and validation
 
-- Client [Listeners](../modules/client/watchers/listeners/index.ts) stores by path, but delete accepts UUID and looks up that UUID. Creating multiple listeners at one path overwrites ownership tracking without stopping previous listeners; destroying either can remove the tracked newer one.
-- Service Listener receives client UUID but never assigns its private client field. Consequently unregister-by-client does not remove those listeners as intended when a shared root retains other clients.
-- Listener.stop creates a PendingPromise but never resolves it on success. A concurrent stop can wait forever. Preconditions and watcher.start failures occur outside protective settlement blocks and can strand pending state.
-- Listener.destroy during listen can find no ID and return while the start later registers a listener. The callback has no destroyed-state rejection after awaited work. There is no full cancellation protocol.
-- Internal Watcher.stop checks absence of ID before awaiting in-progress startup; releasing during start can return without stopping the eventual service watcher. Listener destruction and watcher delete are not awaited as one ordered cleanup.
-- Service Watcher.destroy calls chokidar.close but does not return its promise. The registry's await therefore does not await actual closure. Specs map entries are retained after deletion.
-- No chokidar error subscription propagates watch failure to the client. Create/listen completion is not filesystem-ready success. IPC disconnect or failed child startup can leave requests unresolved because the dependency dispatcher has no timeout.
-- WatchersService.kill leaves the IPC registration behind. A repeated service name can fail duplicate registration, and pending callers are not explicitly rejected.
-
-These are current source-level limitations, not recommended lifecycle patterns. Before promising safe shutdown, add explicit start/readiness/error/stop contracts and verify shared ownership under failure and cancellation.
-
-## Consumers and verification
-
-Finder consumes a WatcherClient rather than creating a service. It uses add/unlink to update file membership and change to notify DynamicFile/content consumers. Packages can supply one watcher for a package's processor inputs. Neither consuming package creates a complete event service simply by importing the client; the application must bootstrap the named IPC service.
-
-[beyond.json](../beyond.json) selects the source package. node/node-ts distributions serve implementation modules on 1110/1111; no root scripts or test runner config are supplied. The [publish workflow](../.github/workflows/publish.yml) requests an npm distribution absent from this manifest, so release configuration must be reconciled. Static packaging must include fork.js and deliberately exclude the development marker.
-
-The [test harness](../tests/test-watchers/index.js) changes files under its fixture, uses legacy BEE, waits a fixed delay for startup and does not retain/kill its service. Its event handlers log but never push to Recorders; positive assertions log failures without throwing and can print OK. Its `*.md` exclusion expectation conflicts with literal matching. These gaps must be repaired before treating the harness as a passing watcher proof.
-
-Acceptance should cover service startup failure, explicit chokidar readiness, add/change/unlink, literal filters, two services on one path, multiple listeners per path, concurrent start/stop, destroy-during-start, exact final refcount release, child exit, event unsubscription and actual process/filesystem-handle shutdown. Event delivery alone does not establish HMR acceptance.
+[beyond.json](../beyond.json) selects the package; the `node-esm` distribution serves the service to another project during development. The tests under [tests/](../tests/README.md) start the real service process; [validation](validation.md) maps each contract to its test and states what is not established.

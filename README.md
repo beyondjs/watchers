@@ -1,25 +1,28 @@
 # @beyond-js/watchers
 
-Monitor filesystem roots in a forked Node service and deliver filtered file events through Beyond IPC.
+Watch filesystem roots in a child Node process and deliver filtered file events to clients through Beyond IPC.
 
-Read [architecture, APIs and lifecycle](docs/architecture.md) before integrating the package. The guide explains configuration, execution flow, source limitations and verification cases. Public Beyond modules are **service, service/process, client and types**; their module manifests and marked bundle exports define the API.
+```ts
+import { WatchersService } from '@beyond-js/watchers/service';   // the parent process
+import { WatcherClient } from '@beyond-js/watchers/client';
 
-This checkout is authored with Beyond. [beyond.json](beyond.json) selects [package.json](package.json), whose module root is `modules`. Source module directories are not plain Node entrypoints; compiled public modules and their dependencies must be available to the consumer.
+const service = new WatchersService('watchers');
+await service.start();                                             // the child reports its handlers installed
 
-Start/register the service separately from creating clients. WatcherClient exposes `start()` and reference-releasing `destroy()`, not `stop()`. A listener has `listen()`, `stop()` and `destroy()`. Startup/shutdown have known protocol and promise gaps; [lifecycle requirements](docs/architecture.md#lifecycle-limitations-requiring-repair) must be addressed before relying on cleanup.
+const client = new WatcherClient('watchers', { path: root, is: 'application' });
+const listener = client.listeners.create(root, { extname: ['.ts'] });
+listener.on('change', file => rebuild(file));
+await listener.listen();                                           // the root's initial scan is complete
 
-The build/test prerequisites and gaps are documented in the guide. No generic npm test/build command is supplied by the source manifest.
-
-## Serving the service to another project (development)
-
-The published package exposes only the client and types (`./service` and `./service/process` are empty exports), so a project that needs the watchers service process during development must obtain it from this checkout. The `node-esm` distribution (port 1120, ESM bundles, development tools disabled) serves the compiled modules through the Beyond Engine so that a modern BEE Node process can import `@beyond-js/watchers/service/process`:
-
-```sh
-cd /absolute/path/to/watchers
-npm install --no-audit --no-fund     # Engine validates the dependencies of the served modules
-node /absolute/path/to/engine/index.js
+await listener.destroy();
+await client.destroy();                                            // the last client releases the watcher
+await service.stop();
 ```
 
-The Packages `@beyond-js/packages/watchers` module spawns the child process with the loader's `execArgv` and `BEE_URL=http://localhost:1120`, awaits its readiness through the IPC channel and registers it as the named service. This is a development arrangement; the service is still not published.
+Public Beyond modules are **client**, **types**, **service** and **service/process**. The published package carries the client and the types; the service is compiled from this checkout, which the Beyond compiler's bootstrap does. [Architecture, APIs and lifecycle](docs/architecture.md) explains the service, the sharing of watchers by path, listeners and their literal filters, event order, readiness and release; [validation](docs/validation.md) maps each contract to its test against the real service process.
+
+What a consumer relies on: `start()` of the service resolves when its handlers are installed and rejects when the child fails or stays silent; `start()` of a client and `listen()` of a listener resolve when the service reports the root ready, so a change made right after is observed; `all` and the specific event are independent announcements; a destroyed client releases its own reference only; releases are awaitable.
+
+This checkout is authored with Beyond: [beyond.json](beyond.json) selects [package.json](package.json), whose module root is `modules`. Compiled public modules and their dependencies must be available through a Beyond loader.
 
 MIT; see [LICENSE](LICENSE).
