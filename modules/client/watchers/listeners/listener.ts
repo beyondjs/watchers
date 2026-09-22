@@ -50,10 +50,23 @@ export class Listener extends EventEmitter {
 
 	#promises: { start?: PendingPromise<UUID>; stop?: PendingPromise<void> } = {};
 
+	/**
+	 * A subscriber of one event must not keep the others from being notified: `all` and the event itself
+	 * are independent announcements, and a listener that throws used to leave the specific event unemitted,
+	 * so a file silently stopped being watched.
+	 */
 	#change = (event: ListenerChangeEventType) => {
-		this.emit('all', event.event, event.file);
-		this.emit(event.event, event.file);
+		this.#announce('all', event.event, event.file);
+		this.#announce(event.event, event.file);
 	};
+
+	#announce(event: string, ...params: unknown[]) {
+		try {
+			this.emit(event, ...params);
+		} catch (exc) {
+			console.warn(`Error announcing "${event}" of the FS listener on "${this.#path}"`, (<Error>exc).stack);
+		}
+	}
 
 	async listen() {
 		if (this.#id) return this.#id; // Listener already started
