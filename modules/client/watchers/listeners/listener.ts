@@ -10,6 +10,9 @@ import { ipc } from '@beyond-js/ipc/wrapper';
 import { PendingPromise } from '@beyond-js/pending-promise/main';
 import { EventEmitter } from 'events';
 
+/**
+ * The watcher a listener belongs to, by the identifier the service gave it
+ */
 export /*bundle*/ interface ListenerSpec {
 	watcher: UUID;
 }

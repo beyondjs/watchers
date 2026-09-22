@@ -8,6 +8,9 @@ import { PendingPromise } from '@beyond-js/pending-promise/main';
  */
 const SPECIFIER = '@beyond-js/watchers/service/process';
 
+/**
+ * How the child process of a watchers service is started
+ */
 export /*bundle*/ interface IWatchersServiceOptions {
 	/**
 	 * The Node arguments of the child, which carry the registration of the module loader. They default to
