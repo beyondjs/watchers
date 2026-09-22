@@ -101,24 +101,32 @@ export class Listener extends EventEmitter {
 		return this.#id;
 	}
 
+	/**
+	 * Releases the listener in the service.
+	 *
+	 * The promise a concurrent call receives is the one of the release in progress, and it is settled
+	 * exactly once: a release that fails used to reject a promise nobody was holding, which ended the
+	 * process of the client with the failure of a listener it was already discarding.
+	 */
 	async stop() {
 		const promises = this.#promises;
 		const watcher = this.#watcher;
 
-		// If stopping the watcher when it is already starting, wait the start be completed
-		if (promises.stop) await promises.stop;
-
 		if (promises.stop) return await promises.stop;
-		promises.stop = new PendingPromise();
 
-		if (!watcher.id) throw new Error('Watcher not started');
+		const stopping: PendingPromise<void> = new PendingPromise();
+		promises.stop = stopping;
 
-		// If stopping the listener when it is already starting, wait the start be completed
-		if (promises.start) await promises.start;
-
-		if (!this.#id) throw new Error('Listener not started');
+		// The outcome is reported to whoever asked for it; this keeps the promise from being unobserved
+		stopping.catch(() => void 0);
 
 		try {
+			// If stopping the listener while it is starting, wait for the start to be completed
+			if (promises.start) await promises.start;
+
+			if (!watcher.id) throw new Error('Watcher not started');
+			if (!this.#id) throw new Error('Listener not started');
+
 			// Remove the `change` event listener
 			ipc.off(this.#watcher.service, `listener:${this.#id}.change`, this.#change);
 
@@ -126,15 +134,23 @@ export class Listener extends EventEmitter {
 			const message: IListenerDelete = { watcher: watcher.id, id: this.#id };
 			await ipc.exec(this.#watcher.service, 'listeners.delete', message);
 			this.#id = undefined;
+			stopping.resolve();
 		} catch (exc) {
-			promises.stop.reject(exc);
+			stopping.reject(exc);
 			throw exc;
 		} finally {
 			delete promises.stop;
 		}
 	}
 
-	destroy() {
+	/**
+	 * Discards the listener and releases it in the service.
+	 *
+	 * It answers when the release has been attempted, so that whoever discards a watcher can release its
+	 * listeners before the watcher itself: a watcher deleted first leaves its listeners naming something
+	 * the service no longer has.
+	 */
+	async destroy() {
 		if (this.#destroyed) {
 			console.warn(`FS listener "${this.#path}" already destroyed`);
 			return;
@@ -144,6 +160,6 @@ export class Listener extends EventEmitter {
 		this.emit('destroyed');
 		this.removeAllListeners();
 		if (!this.#id) return;
-		this.stop().catch(exc => console.log(exc.stack));
+		await this.stop().catch(exc => console.log(exc.stack));
 	}
 }

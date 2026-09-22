@@ -19,18 +19,23 @@ export default class Listeners {
 		return listener;
 	}
 
-	delete(id: UUID) {
+	async delete(id: UUID) {
 		const listeners = this.#listeners;
 		if (!listeners.has(id)) throw new Error(`Listener with id "${id}" is not registered`);
 
 		const listener = listeners.get(id);
-		!listener.destroyed && listener.destroy();
+		!listener.destroyed && (await listener.destroy());
 		listeners.delete(id);
 	}
 
-	destroy() {
-		const listeners = this.#listeners;
-		listeners.forEach(listener => !listener.destroyed && listener.destroy());
-		listeners.clear();
+	/**
+	 * Releases every listener of the watcher and answers when all of them have been released, which is what
+	 * lets the watcher be deleted afterwards: deleting it first leaves these releases naming a watcher the
+	 * service no longer has, and each of them fails
+	 */
+	async destroy() {
+		const listeners = [...this.#listeners.values()].filter(listener => !listener.destroyed);
+		await Promise.all(listeners.map(listener => listener.destroy()));
+		this.#listeners.clear();
 	}
 }

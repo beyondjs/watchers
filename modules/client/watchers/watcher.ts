@@ -85,17 +85,23 @@ export default class Watcher {
 		if (promises.start) await promises.start;
 
 		if (promises.stop) return await promises.stop;
-		promises.stop = new PendingPromise();
+
+		const stopping: PendingPromise<void> = new PendingPromise();
+		promises.stop = stopping;
+
+		// The outcome is reported to whoever asked for it; this keeps the promise from being unobserved
+		stopping.catch(() => void 0);
 
 		try {
-			this.#listeners.destroy();
+			// The listeners are released first: they name this watcher, which the service forgets below
+			await this.#listeners.destroy();
 			await ipc.exec(this.#service, 'delete', { id: this.#id });
 			this.#id = undefined;
-			promises.stop.resolve();
+			stopping.resolve();
 		} catch (exc) {
 			const error = new Error('Error stopping watcher');
 			exc = new ChainedException(error, exc);
-			promises.stop.reject(exc);
+			stopping.reject(<Error>exc);
 			throw exc;
 		} finally {
 			delete promises.stop;
