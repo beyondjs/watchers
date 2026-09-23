@@ -4,6 +4,7 @@ import type { Stats } from 'fs';
 import * as chokidar from 'chokidar';
 import { PendingPromise } from '@beyond-js/pending-promise/main';
 import Listeners from './listeners';
+import Recheck from './recheck';
 
 /**
  * Recursive fs watcher to listen for file changes
@@ -20,6 +21,9 @@ export default class Watcher {
 	get listeners() {
 		return this.#listeners;
 	}
+
+	/** Examines an announced file again once chokidar's change window has passed: see Recheck */
+	#recheck: Recheck;
 
 	/** Resolves when the initial scan of the root completed and events are being delivered */
 	#ready: PendingPromise<void> = new PendingPromise();
@@ -58,9 +62,23 @@ export default class Watcher {
 		this.#watcher = watcher;
 		const listeners = this.#listeners;
 
-		const add = (file: string, stats: Stats) => this.#scanned && listeners.change('add', file, stats);
-		const unlink = (file: string, stats: Stats) => this.#scanned && listeners.change('unlink', file, stats);
-		const change = (file: string, stats: Stats) => this.#scanned && listeners.change('change', file, stats);
+		const change = (file: string, stats: Stats) => {
+			if (!this.#scanned) return;
+			this.#recheck.observe(file, stats);
+			listeners.change('change', file, stats);
+		};
+		this.#recheck = new Recheck(change);
+
+		const add = (file: string, stats: Stats) => {
+			if (!this.#scanned) return;
+			this.#recheck.observe(file, stats);
+			listeners.change('add', file, stats);
+		};
+		const unlink = (file: string, stats: Stats) => {
+			if (!this.#scanned) return;
+			this.#recheck.forget(file);
+			listeners.change('unlink', file, stats);
+		};
 
 		watcher.on('ready', () => {
 			this.#scanned = true;
@@ -92,6 +110,7 @@ export default class Watcher {
 	 * Closes the filesystem watcher and answers when it is closed
 	 */
 	async destroy(): Promise<void> {
+		this.#recheck.destroy();
 		await this.#watcher.close();
 	}
 }

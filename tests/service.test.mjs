@@ -4,7 +4,7 @@
  */
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, mkdir, realpath, writeFile, rm } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, realpath, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { ipc } from '@beyond-js/ipc/main';
@@ -184,6 +184,33 @@ test('clients on one path share a watcher, a destroyed client releases its refer
 	await listener.destroy();
 	await two.destroy();
 	assert.equal(two.destroyed, true);
+});
+
+test('a file written again inside the change window of its previous write is announced again', async t => {
+	const path = await temporary(t);
+	const file = join(path, 'saved.txt');
+	await writeFile(file, 'first\n');
+
+	const client = new WatcherClient(NAME, { is: 'test', path });
+	const listener = client.listeners.create(path, {});
+	t.after(async () => {
+		await listener.destroy();
+		await client.destroy();
+	});
+	const heard = record(listener);
+	await listener.listen();
+
+	// The second write is made as soon as the first change is heard: inside the 50 ms in which chokidar
+	// reports one change of a path and drops the others, as a formatter writing after a save does
+	let second;
+	listener.on('change', () => (second ??= writeFile(file, 'second\n')));
+	await writeFile(file, 'edited\n');
+	await until(() => heard.change.length >= 1, 'the change of the first write');
+	await second;
+
+	await until(() => heard.change.length >= 2, 'the change of the write made inside the window');
+	assert.deepEqual(heard.change.slice(0, 2), [file, file]);
+	assert.equal(await readFile(file, 'utf8'), 'second\n');
 });
 
 test('a listener destroyed while it starts is released in the service, and nothing stays registered', async t => {
